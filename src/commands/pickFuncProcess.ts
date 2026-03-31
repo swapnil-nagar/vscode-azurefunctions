@@ -5,7 +5,7 @@
 
 import { sendRequestWithTimeout, type AzExtRequestPrepareOptions } from '@microsoft/vscode-azext-azureutils';
 import { callWithTelemetryAndErrorHandling, parseError, UserCancelledError, type IActionContext } from '@microsoft/vscode-azext-utils';
-import * as unixPsTree from 'ps-tree';
+import psTree, { type PS } from 'ps-tree';
 import * as vscode from 'vscode';
 import { hostStartTaskName } from '../constants';
 import { preDebugValidate, type IPreDebugValidateResult } from '../debug/validatePreDebug';
@@ -21,15 +21,48 @@ import { getWorkspaceSetting } from '../vsCodeConfig/settings';
 const funcTaskReadyEmitter = new vscode.EventEmitter<vscode.WorkspaceFolder>();
 export const onDotnetFuncTaskReady = funcTaskReadyEmitter.event;
 
+export function disposeFuncTaskReadyEmitter(): void {
+    funcTaskReadyEmitter.dispose();
+}
+
+/**
+ * Result returned from starting a function host process via the API.
+ */
+export interface IStartFuncProcessResult {
+    /**
+     * The process ID of the started function host.
+     */
+    processId: string;
+    /**
+     * Whether the function host was successfully started.
+     */
+    success: boolean;
+    /**
+     * Error message if the function host failed to start.
+     */
+    error: string;
+    /**
+     * An async iterable stream of terminal output from the function host task.
+     * This stream provides real-time access to the output of the `func host start` command,
+     * allowing consumers to monitor host status, capture logs, and detect errors.
+     *
+     * The stream will be undefined if the host failed to start or if output streaming is not available.
+     * Consumers should iterate over the stream asynchronously to read output lines as they are produced.
+     * The stream remains active for the lifetime of the function host process.
+     */
+    stream: AsyncIterable<string> | undefined;
+}
+
 export async function startFuncProcessFromApi(
     buildPath: string,
     args: string[],
     env: { [key: string]: string }
-): Promise<{ processId: string; success: boolean; error: string }> {
-    const result = {
+): Promise<IStartFuncProcessResult> {
+    const result: IStartFuncProcessResult = {
         processId: '',
         success: false,
-        error: ''
+        error: '',
+        stream: undefined
     };
 
     let funcHostStartCmd: string = 'func host start';
@@ -46,7 +79,7 @@ export async function startFuncProcessFromApi(
                     uri: vscode.Uri.parse(buildPath),
                     name: buildPath,
                     index: -1
-                }
+                };
             }
 
             await waitForPrevFuncTaskToStop(workspaceFolder);
@@ -66,13 +99,14 @@ export async function startFuncProcessFromApi(
             const taskInfo = await startFuncTask(context, workspaceFolder, buildPath, funcTask);
             result.processId = await pickChildProcess(taskInfo);
             result.success = true;
+            result.stream = taskInfo.stream;
         } catch (err) {
             const pError = parseError(err);
             result.error = pError.message;
         }
     });
 
-    return result
+    return result;
 }
 
 export async function pickFuncProcess(context: IActionContext, debugConfig: vscode.DebugConfiguration): Promise<string | undefined> {
@@ -81,7 +115,6 @@ export async function pickFuncProcess(context: IActionContext, debugConfig: vsco
         throw new UserCancelledError('preDebugValidate');
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     const preLaunchTaskName: string | undefined = debugConfig.preLaunchTask;
     const tasks: vscode.Task[] = await vscode.tasks.fetchTasks();
     const funcTask: vscode.Task | undefined = tasks.find(t => {
@@ -156,7 +189,6 @@ async function startFuncTask(context: IActionContext, workspaceFolder: vscode.Wo
                     try {
                         // wait for status url to indicate functions host is running
                         const response = await sendRequestWithTimeout(context, statusRequest, statusRequestTimeout, undefined);
-                        // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
                         if (response.parsedBody.state.toLowerCase() === 'running') {
                             funcTaskReadyEmitter.fire(workspaceFolder);
                             return taskInfo;
@@ -194,7 +226,7 @@ type OSAgnosticProcess = { command: string | undefined; pid: number | string };
 async function pickChildProcess(taskInfo: IRunningFuncTask): Promise<string> {
     // Workaround for https://github.com/microsoft/vscode-azurefunctions/issues/2656
     if (!isRunning(taskInfo.processId) && vscode.window.activeTerminal) {
-        const terminalPid = await vscode.window.activeTerminal.processId
+        const terminalPid = await vscode.window.activeTerminal.processId;
         if (terminalPid) {
             // NOTE: Intentionally updating the object so that `runningFuncTaskMap` is affected, too
             taskInfo.processId = terminalPid;
@@ -207,11 +239,11 @@ async function pickChildProcess(taskInfo: IRunningFuncTask): Promise<string> {
 
 // Looks like this bug was fixed, but never merged:
 // https://github.com/indexzero/ps-tree/issues/18
-type ActualUnixPS = unixPsTree.PS & { COMM?: string };
+type ActualUnixPS = PS & { COMM?: string };
 
 async function getUnixChildren(pid: number): Promise<OSAgnosticProcess[]> {
     const processes: ActualUnixPS[] = await new Promise((resolve, reject): void => {
-        unixPsTree(pid, (error: Error | null, result: unixPsTree.PS[]) => {
+        psTree(pid, (error: Error | null, result: PS[]) => {
             if (error) {
                 reject(error);
             } else {

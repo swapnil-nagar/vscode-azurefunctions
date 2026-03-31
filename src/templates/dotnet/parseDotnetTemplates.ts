@@ -77,6 +77,7 @@ function parseDotnetTemplate(rawTemplate: IRawTemplate): IFunctionTemplate {
     return {
         isHttpTrigger: /^http/i.test(rawTemplate.Name) || /webhook$/i.test(rawTemplate.Name),
         isTimerTrigger: /^timer/i.test(rawTemplate.Name),
+        isMcpTrigger: /^mcptooltrigger/i.test(rawTemplate.Name),
         isSqlBindingTemplate: sqlBindingTemplateRegex.test(rawTemplate.Name),
         id: rawTemplate.Identity,
         name: rawTemplate.Name,
@@ -85,7 +86,8 @@ function parseDotnetTemplate(rawTemplate: IRawTemplate): IFunctionTemplate {
         userPromptedSettings: userPromptedSettings,
         categories: [TemplateCategory.Core], // Dotnet templates do not have category information, so display all templates as if they are in the 'core' category
         isDynamicConcurrent: (rawTemplate.Identity.includes('ServiceBusQueueTrigger') || rawTemplate.Identity.includes('BlobTrigger') || rawTemplate.Identity.includes('QueueTrigger')) ? true : false,
-        templateSchemaVersion: TemplateSchemaVersion.v1
+        templateSchemaVersion: TemplateSchemaVersion.v1,
+        templateFilter: TemplateFilter.All
     };
 }
 
@@ -98,7 +100,7 @@ export async function parseDotnetTemplates(rawTemplates: object[], version: Func
     for (const rawTemplate of rawTemplates) {
         try {
             functionTemplates.push(parseDotnetTemplate(<IRawTemplate>rawTemplate));
-        } catch (error) {
+        } catch (_error) {
             // Ignore errors so that a single poorly formed template does not affect other templates
         }
     }
@@ -122,7 +124,7 @@ async function copyCSharpSettingsFromJS(csharpTemplates: IFunctionTemplate[], ve
         jsContext.telemetry.properties.isActivationEvent = 'true';
 
         const templateProvider = ext.templateProvider.get(jsContext);
-        const jsTemplates: FunctionTemplateBase[] = await templateProvider.getFunctionTemplates(jsContext, undefined, ProjectLanguage.JavaScript, undefined, version, TemplateFilter.All, undefined);
+        const jsTemplates: FunctionTemplateBase[] = await templateProvider.getFunctionTemplates(jsContext, undefined, ProjectLanguage.JavaScript, undefined, version, undefined);
         for (const csharpTemplate of csharpTemplates) {
             assertTemplateIsV1(csharpTemplate);
             csharpTemplate.templateSchemaVersion = TemplateSchemaVersion.v1;

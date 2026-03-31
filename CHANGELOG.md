@@ -1,5 +1,71 @@
 # Change Log
 
+## 1.21.0 - 2026-04-03
+
+### Added
+* [[4883](https://github.com/microsoft/vscode-azurefunctions/pull/4883)] Add a **Function Host Debug** view in the Run and Debug panel that lists running Function Host tasks, displays recent error output, and send errors to Copilot or provides commands to view logs
+* [[4909](https://github.com/microsoft/vscode-azurefunctions/pull/4909)] Support for domain name label scopes
+
+### Changed
+* [[4826](https://github.com/microsoft/vscode-azurefunctions/pull/4826)] Group templates by filter rather than filtering them out
+* [[4892](https://github.com/microsoft/vscode-azurefunctions/pull/4892)] Use StorageV2 for storage account creation
+* [[4902](https://github.com/microsoft/vscode-azurefunctions/pull/4902)] Auto-open `mcp.json` after Self-Hosted MCP Server project creation
+
+### Fixed
+* [[4880](https://github.com/microsoft/vscode-azurefunctions/pull/4880)] Fix refresh error on collapsed function app nodes
+* [[4901](https://github.com/microsoft/vscode-azurefunctions/pull/4901)] Respect Java remote debugging setting precedence when both debug modes are enabled
+* [[4914](https://github.com/microsoft/vscode-azurefunctions/pull/4914)] Fix no response when executing "Create New Project" command
+* [[4915](https://github.com/microsoft/vscode-azurefunctions/pull/4915)] Fix not being able to get .NET latest templates
+* [[4923](https://github.com/microsoft/vscode-azurefunctions/pull/4923)] Performance improvements
+* [[4929](https://github.com/microsoft/vscode-azurefunctions/pull/4929)] Don't call for `storageConnectionString` if it's not needed
+* [[4944](https://github.com/microsoft/vscode-azurefunctions/pull/4944)] Remove `proxies.json` from JSON schema contribution
+
+## 1.20.3 - 2025-12-16
+
+### Added
+* [[4861](https://github.com/microsoft/vscode-azurefunctions/pull/4861)] Add error message when deploying to flex apps with python 3.14
+* [[4847](https://github.com/microsoft/vscode-azurefunctions/pull/4847)] Add .NET 10 and Java 25
+
+### Changed
+* [[4827](https://github.com/microsoft/vscode-azurefunctions/pull/4827)] Update `typescript` version and TS compile options in template files
+* [[4862](https://github.com/microsoft/vscode-azurefunctions/pull/4862)] [[4863](https://github.com/microsoft/vscode-azurefunctions/pull/4863)] Allow flex consumption deployments for DTS
+
+### Fixed
+* [[4858](https://github.com/microsoft/vscode-azurefunctions/pull/4858)] Fix an issue where DTS emulator was failing to start on some Windows machines
+* [[4855](https://github.com/microsoft/vscode-azurefunctions/pull/4855)] Fix a `Netherite` connection setting boolean
+* [[4853](https://github.com/microsoft/vscode-azurefunctions/pull/4853)] Always verify and update app connection strings
+
+## 1.20.2 - 2025-11-25
+
+### Fixed
+* [[4837]](https://github.com/microsoft/vscode-azurefunctions/issues/4837) Fix not being able to create Premium SKU plans in `Create Function App in Azure (Advanced)`
+
+## 1.20.1 - 2025-11-19
+
+### Fixed
+* [[4832]](https://github.com/microsoft/vscode-azurefunctions/pull/4832) Fix `pickFuncProcess` not finding the `func host start` task if there were additional flags on the command
+
+## 1.20.0 - 2025-11-17
+
+### Overview
+This release introduces support for creating and deploying Model Context Protocol (MCP) servers using Azure Functions and brings support for building MCP servers across multiple languages including TypeScript, JavaScript, Python, and .NET.
+
+### Added
+* [[4789](https://github.com/microsoft/vscode-azurefunctions/pull/4789)] Add support for creating **self-hosted MCP servers** with Azure Functions as a new project type
+* [[4790](https://github.com/microsoft/vscode-azurefunctions/pull/4790)] Add **MCP Tool Trigger** templates for extension-based MCP function apps
+* [[4791](https://github.com/microsoft/vscode-azurefunctions/pull/4791)] Add **MCP deployment** support for both extension triggers and self-hosted servers
+
+### Changed
+* [[4772](https://github.com/microsoft/vscode-azurefunctions/pull/4772)] Update minimum **Azure Container Apps API** version to `v1.0.0`
+* [[4773](https://github.com/microsoft/vscode-azurefunctions/pull/4773)] Improve template filtering with **grouping by category** instead of hiding templates
+* [[4783](https://github.com/microsoft/vscode-azurefunctions/pull/4783)] Add support for **Python 3.13 and 3.14** and remove deprecated Python versions (3.7, 3.8, 3.9)
+
+### Fixed
+* [[4739](https://github.com/microsoft/vscode-azurefunctions/pull/4739)] Fix incorrect error message displayed when deploying to **containerized function apps**
+
+### Engineering
+* [[4731](https://github.com/microsoft/vscode-azurefunctions/pull/4731)] Refactor **Functions Core Tools** installation and pretest logic
+
 ## 1.19.2 - 2025-10-08
 
 ### Fix

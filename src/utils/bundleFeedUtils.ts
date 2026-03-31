@@ -14,7 +14,7 @@ import { nugetUtils } from './nugetUtils';
 
 export namespace bundleFeedUtils {
     export const defaultBundleId: string = 'Microsoft.Azure.Functions.ExtensionBundle';
-    export const defaultVersionRange: string = '[1.*, 2.0.0)';
+    export const defaultVersionRange: string = '[4.*, 5.0.0)';
 
     interface IBundleFeed {
         defaultVersionRange: string;
@@ -76,7 +76,7 @@ export namespace bundleFeedUtils {
             bindings: `${functionsCdn}${templateVersion}/StaticContent/v2/bindings/userPrompts.json`,
             userPrompts: `${functionsCdn}${templateVersion}/StaticContent/v2/bindings/userPrompts.json`,
             resources: `${functionsCdn}${templateVersion}/StaticContent/v2/resources/Resources.{locale}.json`,
-        }
+        };
     }
 
     export function isBundleTemplate(template: FunctionTemplateBase | IBindingTemplate): boolean {

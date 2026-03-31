@@ -4,13 +4,14 @@
  *--------------------------------------------------------------------------------------------*/
 
 import { AzExtFsExtra, DialogResponses, nonNullValueAndProp, type IActionContext } from '@microsoft/vscode-azext-utils';
+import { composeArgs, withArg, withNamedArg } from '@microsoft/vscode-processutils';
 import * as path from 'path';
 import { getMajorVersion, type FuncVersion } from '../../../FuncVersion';
 import { ConnectionKey, ProjectLanguage, gitignoreFileName, hostFileName, localSettingsFileName } from '../../../constants';
 import { ext } from '../../../extensionVariables';
 import { MismatchBehavior, setLocalAppSetting } from '../../../funcConfig/local.settings';
 import { localize } from "../../../localize";
-import { executeDotnetTemplateCommand, validateDotnetInstalled } from '../../../templates/dotnet/executeDotnetTemplateCommand';
+import { executeDotnetTemplateCreate, validateDotnetInstalled } from '../../../templates/dotnet/executeDotnetTemplateCommand';
 import { cpUtils } from '../../../utils/cpUtils';
 import { nonNullProp } from '../../../utils/nonNull';
 import { type IProjectWizardContext } from '../IProjectWizardContext';
@@ -38,9 +39,13 @@ export class DotnetProjectCreateStep extends ProjectCreateStepBase {
         // currentely the version created by func init is behind the template version
         if (context.containerizedProject) {
             const runtime = context.workerRuntime?.capabilities.includes('isolated') ? 'dotnet-isolated' : 'dotnet';
-            // targetFramework is only supported for dotnet-isolated projects
-            const targetFramework = runtime === 'dotnet' ? '' : "--target-framework " + nonNullValueAndProp(context.workerRuntime, 'targetFramework');
-            await cpUtils.executeCommand(ext.outputChannel, context.projectPath, "func", "init", "--worker-runtime", runtime, targetFramework, "--docker");
+            const args = composeArgs(
+                withArg('init'),
+                withNamedArg('--worker-runtime', runtime),
+                withNamedArg('--target-framework', runtime === 'dotnet' ? undefined : nonNullValueAndProp(context.workerRuntime, 'targetFramework')), // targetFramework is only supported for dotnet-isolated projects
+                withArg('--docker'),
+            )();
+            await cpUtils.executeCommand(ext.outputChannel, context.projectPath, "func", args);
         } else {
             await this.confirmOverwriteExisting(context, projName);
         }
@@ -52,11 +57,16 @@ export class DotnetProjectCreateStep extends ProjectCreateStepBase {
         }
         const functionsVersion: string = 'v' + majorVersion;
         const projTemplateKey = nonNullProp(context, 'projectTemplateKey');
-        const args = ['--identity', identity, '--arg:name', cpUtils.wrapArgInQuotes(projectName), '--arg:AzureFunctionsVersion', functionsVersion];
-        // defaults to net6.0 if there is no targetFramework
-        args.push('--arg:Framework', cpUtils.wrapArgInQuotes(context.workerRuntime?.targetFramework));
 
-        await executeDotnetTemplateCommand(context, version, projTemplateKey, context.projectPath, 'create', ...args);
+        const templateArgs: Record<string, string> = {
+            name: projectName,
+            AzureFunctionsVersion: functionsVersion,
+        };
+        if (context.workerRuntime?.targetFramework) {
+            templateArgs.Framework = context.workerRuntime.targetFramework;
+        }
+
+        await executeDotnetTemplateCreate(context, version, projTemplateKey, context.projectPath, identity, templateArgs);
 
         await setLocalAppSetting(context, context.projectPath, ConnectionKey.Storage, '', MismatchBehavior.Overwrite);
     }

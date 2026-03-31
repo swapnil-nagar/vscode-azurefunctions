@@ -3,11 +3,11 @@
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
-import { AppInsightsCreateStep, AppInsightsListStep, AppKind, AppServicePlanCreateStep, AppServicePlanListStep, CustomLocationListStep, LogAnalyticsCreateStep, SiteNameStep, WebsiteOS, type IAppServiceWizardContext } from "@microsoft/vscode-azext-azureappservice";
+import { AppInsightsCreateStep, AppInsightsListStep, AppKind, AppServicePlanCreateStep, AppServicePlanListStep, CustomLocationListStep, DomainNameLabelScope, LogAnalyticsCreateStep, SiteDomainNameLabelScopeStep, SiteNameStep, WebsiteOS, type IAppServiceWizardContext } from "@microsoft/vscode-azext-azureappservice";
 import { CommonRoleDefinitions, createRoleId, LocationListStep, ResourceGroupCreateStep, ResourceGroupListStep, RoleAssignmentExecuteStep, StorageAccountCreateStep, StorageAccountKind, StorageAccountListStep, StorageAccountPerformance, StorageAccountReplication, type INewStorageAccountDefaults, type Role } from "@microsoft/vscode-azext-azureutils";
 import { type AzureWizardExecuteStep, type AzureWizardPromptStep, type ISubscriptionContext } from "@microsoft/vscode-azext-utils";
 import { FuncVersion, latestGAVersion, tryParseFuncVersion } from "../../FuncVersion";
-import { funcVersionSetting } from "../../constants";
+import { DurableBackend, funcVersionSetting } from "../../constants";
 import { tryGetLocalFuncVersion } from "../../funcCoreTools/tryGetLocalFuncVersion";
 import { type ICreateFunctionAppContext } from "../../tree/SubscriptionTreeItem";
 import { createActivityContext } from "../../utils/activityUtils";
@@ -15,7 +15,7 @@ import { durableUtils } from "../../utils/durableUtils";
 import { getRootFunctionsWorkerRuntime, getWorkspaceSetting, getWorkspaceSettingFromAnyFolder } from "../../vsCodeConfig/settings";
 import { AuthenticationPromptStep } from "./AuthenticationPromptStep";
 import { FunctionAppCreateStep } from "./FunctionAppCreateStep";
-import { FunctionAppHostingPlanStep } from "./FunctionAppHostingPlanStep";
+import { allAvailableFunctionAppHostingPlans, FunctionAppHostingPlans, FunctionAppHostingPlanStep } from "./FunctionAppHostingPlanStep";
 import { type IFunctionAppWizardContext } from "./IFunctionAppWizardContext";
 import { ConfigureCommonNamesStep } from "./UniqueNamePromptStep";
 import { ContainerizedFunctionAppCreateStep } from "./containerImage/ContainerizedFunctionAppCreateStep";
@@ -48,7 +48,7 @@ export async function createCreateFunctionAppComponents(context: ICreateFunction
     const executeSteps: AzureWizardExecuteStep<IFunctionAppWizardContext>[] = [];
 
     const storageAccountCreateOptions: INewStorageAccountDefaults = {
-        kind: StorageAccountKind.Storage,
+        kind: StorageAccountKind.StorageV2,
         performance: StorageAccountPerformance.Standard,
         replication: StorageAccountReplication.LRS
     };
@@ -59,6 +59,21 @@ export async function createCreateFunctionAppComponents(context: ICreateFunction
         wizardContext.durableStorageType = await durableUtils.getStorageTypeFromWorkspace(language, wizardContext.workspaceFolder.uri.fsPath);
         wizardContext.telemetry.properties.durableStorageType = wizardContext.durableStorageType;
     }
+
+    // #region SiteNameStep pre-requisites
+    if (!context.advancedCreation) {
+        LocationListStep.addStep(wizardContext, promptSteps);
+    } else {
+        CustomLocationListStep.addStep(wizardContext, promptSteps);
+        promptSteps.push(new ResourceGroupListStep());
+    }
+
+    promptSteps.push(new SiteDomainNameLabelScopeStep());
+    if (!wizardContext.advancedCreation) {
+        wizardContext.newSiteDomainNameLabelScope = DomainNameLabelScope.Tenant;
+        wizardContext.telemetry.properties.siteDomainNameLabelScope = DomainNameLabelScope.Tenant;
+    }
+    // #endregion
 
     promptSteps.push(new SiteNameStep(wizardContext.dockerfilePath ? "containerizedFunctionApp" : "functionApp"));
 
@@ -74,7 +89,6 @@ export async function createCreateFunctionAppComponents(context: ICreateFunction
     promptSteps.push(new AuthenticationPromptStep());
 
     if (!wizardContext.advancedCreation) {
-        LocationListStep.addStep(wizardContext, promptSteps);
         // if the user is deploying to a container app, do not use a flex consumption plan
         wizardContext.useFlexConsumptionPlan = !wizardContext.dockerfilePath;
         wizardContext.stackFilter = getRootFunctionsWorkerRuntime(wizardContext.language);
@@ -87,7 +101,6 @@ export async function createCreateFunctionAppComponents(context: ICreateFunction
             executeSteps.push(new LogAnalyticsCreateStep());
         }
     } else {
-        promptSteps.push(new ResourceGroupListStep());
         promptSteps.push(new StorageAccountListStep(
             storageAccountCreateOptions,
             {
@@ -150,13 +163,13 @@ async function createFunctionAppWizard(wizardContext: IFunctionAppWizardContext)
     const promptSteps: AzureWizardPromptStep<IAppServiceWizardContext>[] = [];
     const executeSteps: AzureWizardExecuteStep<IAppServiceWizardContext>[] = [];
 
-    promptSteps.push(new FunctionAppHostingPlanStep());
-    CustomLocationListStep.addStep(wizardContext, promptSteps);
-
+    promptSteps.push(new FunctionAppHostingPlanStep(
+        getAvailableFunctionAppHostingPlans(wizardContext) /** availablePlans */,
+    ));
     promptSteps.push(new FunctionAppStackStep());
 
     if (wizardContext.advancedCreation) {
-        promptSteps.push(new AppServicePlanListStep())
+        promptSteps.push(new AppServicePlanListStep());
     }
 
     if (wizardContext.version === FuncVersion.v1) { // v1 doesn't support linux
@@ -176,4 +189,26 @@ async function createContainerizedFunctionAppWizard(): Promise<{ promptSteps: Az
     executeSteps.push(new ContainerizedFunctionAppCreateStep());
 
     return { promptSteps, executeSteps };
+}
+
+function getAvailableFunctionAppHostingPlans(context: IFunctionAppWizardContext): Set<FunctionAppHostingPlans> {
+    const availablePlans = new Set<FunctionAppHostingPlans>();
+
+    switch (true) {
+        case context.useFlexConsumptionPlan:
+            availablePlans.add(FunctionAppHostingPlans.Flex);
+            break;
+
+        case context.durableStorageType === DurableBackend.DTS:
+            if (context.advancedCreation) {
+                availablePlans.add(FunctionAppHostingPlans.Premium);
+            }
+            availablePlans.add(FunctionAppHostingPlans.Flex);
+            break;
+
+        default:
+            return allAvailableFunctionAppHostingPlans;
+    }
+
+    return availablePlans;
 }

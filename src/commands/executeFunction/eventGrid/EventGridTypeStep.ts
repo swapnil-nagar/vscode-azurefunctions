@@ -4,31 +4,20 @@
  *--------------------------------------------------------------------------------------------*/
 
 import { AzureWizardPromptStep, nonNullProp, type IAzureQuickPickItem } from "@microsoft/vscode-azext-utils";
+import { type GitHubFileMetadata } from "../../../constants";
 import { localize } from "../../../localize";
 import { feedUtils } from "../../../utils/feedUtils";
 import { type EventGridExecuteFunctionContext } from "./EventGridExecuteFunctionContext";
 
+// Using a specific commit SHA to fetch EventGrid sample files since they were removed from main branch
+// See: https://github.com/Azure/azure-rest-api-specs/issues/38235
+// See: https://github.com/Azure/azure-rest-api-specs/pull/38236
+// Pinned commit: https://github.com/Azure/azure-rest-api-specs/commit/752dade436619ed28bd03ca2e77cfa5acf6222dd
+const eventGridSamplesRef = '752dade436619ed28bd03ca2e77cfa5acf6222dd';
 const sampleFilesUrl =
     'https://api.github.com/repos/Azure/azure-rest-api-specs/contents/specification/eventgrid/data-plane/' +
     '{eventSource}' +
-    '/stable/2018-01-01/examples/cloud-events-schema/';
-
-type FileMetadata = {
-    name: string;
-    path: string;
-    sha: string;
-    size: number;
-    url: string;
-    html_url: string;
-    git_url: string;
-    download_url: string;
-    type: string;
-    _links: {
-        self: string;
-        git: string;
-        html: string;
-    };
-};
+    `/stable/2018-01-01/examples/cloud-events-schema/?ref=${eventGridSamplesRef}`;
 
 export class EventGridTypeStep extends AzureWizardPromptStep<EventGridExecuteFunctionContext> {
     public hideStepCount: boolean = false;
@@ -38,7 +27,7 @@ export class EventGridTypeStep extends AzureWizardPromptStep<EventGridExecuteFun
 
         // Get sample files for event source
         const samplesUrl = sampleFilesUrl.replace('{eventSource}', eventSource);
-        const sampleFiles: FileMetadata[] = await feedUtils.getJsonFeed(context, samplesUrl);
+        const sampleFiles: GitHubFileMetadata[] = await feedUtils.getJsonFeed(context, samplesUrl);
         const fileNames: string[] = sampleFiles.map((fileMetadata) => fileMetadata.name);
 
         // Prompt for event type
