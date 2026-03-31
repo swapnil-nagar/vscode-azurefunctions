@@ -619,12 +619,12 @@
         "id": "McpToolTrigger-JavaScript-4.x",
         "runtime": "2",
         "files": {
-            "%functionName%.js": "const { app, output, trigger } = require('@azure\/functions');\r\n\r\n\/**\r\n * Sample Dapr Service Invocation Trigger\r\n * See https:\/\/aka.ms\/azure-functions-dapr for more information about using this binding\r\n *\r\n * These tasks should be completed prior to running :\r\n *      1. Install Dapr\r\n * Run the app with below steps\r\n *      1. Start function app with Dapr: dapr run --app-id functionapp --app-port 3001 --dapr-http-port 3501 -- func host start\r\n *      2. Invoke function app: dapr publish --pubsub pubsub --publish-app-id functionapp --topic A --data '{\"value\": { \"orderId\": \"42\" } }'\r\n *\/\r\nconst daprStateOuput = output.generic({\r\n    type: \"daprState\",\r\n    stateStore: \"statestore\",\r\n    direction: \"out\",\r\n    key: \"product\"\r\n});\r\n\r\napp.generic('%functionName%', {\r\n    trigger: trigger.generic({\r\n        type: \"daprTopicTrigger\",\r\n        pubsubname: \"pubsub\",\r\n        topic: \"A\",\r\n        name: \"subEvent\"\r\n    }),\r\n    return: daprStateOuput,\r\n    handler: async (request, context) => {\r\n        context.log(\"JavaScript DaprTopic trigger with DaprState output binding function processed a request.\");\r\n        context.log(context.triggerMetadata.subEvent.data);\r\n\r\n        return context.triggerMetadata.subEvent.data;\r\n    }\r\n});"
+            "%functionName%.js": "const { app, arg } = require('@azure/functions');\n\nfunction mcpToolHello(_toolArguments, context) {\n    const mcptoolargs = context.triggerMetadata.mcptoolargs || {};\n    const name = mcptoolargs.name || 'world';\n\n    console.info(`Hello ${name}, I am MCP Tool!`);\n\n    return `Hello ${name}, I am MCP Tool!`;\n}\n\napp.mcpTool('hello', {\n    toolName: 'hello',\n    description: 'Simple hello world MCP Tool that responds with a hello message.',\n    toolProperties: {\n        name: arg.string().describe('Name to greet'),\n    },\n    handler: mcpToolHello\n});"
         },
         "metadata": {
             "defaultFunctionName": "mcpToolTrigger",
             "description": "$McpToolTrigger_description",
-            "name": "Mcp Tool trigger",
+            "name": "MCP Tool trigger",
             "language": "JavaScript",
             "triggerType": "mcpToolTrigger",
             "category": [
@@ -640,14 +640,58 @@
         "id": "McpToolTrigger-TypeScript-4.x",
         "runtime": "2",
         "files": {
-            "%functionName%.ts":  "import { app, InvocationContext, arg } from \"@azure/functions\";\n\nexport async function mcpToolHello(_toolArguments: any, context: InvocationContext): Promise<string> {\n    const mcptoolargs = _toolArguments.arguments as {\n        name?: string;\n    };\n    const name = mcptoolargs?.name;\n\n    console.info(`Hello ${name}, I am MCP Tool!`);\n\n    return `Hello ${name}, I am MCP Tool!`;\n}\n\napp.mcpTool('hello', {\n    toolName: 'hello',\n    description: 'Simple hello world MCP Tool that responses with a hello message.',\n    toolProperties: {\n      name: arg.string().describe('Name to greet'),\n    },\n    handler: mcpToolHello\n});"
+            "%functionName%.ts": "import { app, InvocationContext, arg } from \"@azure/functions\";\n\nexport async function mcpToolHello(_toolArguments: unknown, _context: InvocationContext): Promise<string> {\n    const mcptoolargs = (_toolArguments as { arguments?: { name?: string } })?.arguments;\n    const name = mcptoolargs?.name || 'world';\n\n    console.info(`Hello ${name}, I am MCP Tool!`);\n\n    return `Hello ${name}, I am MCP Tool!`;\n}\n\napp.mcpTool('hello', {\n    toolName: 'hello',\n    description: 'Simple hello world MCP Tool that responds with a hello message.',\n    toolProperties: {\n        name: arg.string().describe('Name to greet'),\n    },\n    handler: mcpToolHello\n});"
         },
         "metadata": {
             "defaultFunctionName": "mcpToolTrigger",
             "description": "$McpToolTrigger_description",
-            "name": "Mcp Tool trigger",
+            "name": "MCP Tool trigger",
             "language": "TypeScript",
             "triggerType": "mcpToolTrigger",
+            "category": [
+                "$temp_category_core",
+                "$temp_category_api"
+            ],
+            "categoryStyle": "mcpTool",
+            "enabledInTryMode": true,
+            "userPrompt": []
+        }
+    },
+    {
+        "id": "McpResourceTrigger-JavaScript-4.x",
+        "runtime": "2",
+        "files": {
+            "%functionName%.js": "const { app, arg } = require('@azure/functions');\nconst fs = require('fs');\nconst path = require('path');\n\nconst WEATHER_WIDGET_URI = 'ui://weather/index.html';\nconst WEATHER_WIDGET_NAME = 'Weather Widget';\nconst WEATHER_WIDGET_DESCRIPTION = 'Interactive weather display for MCP Apps';\nconst WEATHER_WIDGET_MIME_TYPE = 'text/html;profile=mcp-app';\n\nconst TOOL_METADATA = JSON.stringify({\n    ui: {\n        resourceUri: WEATHER_WIDGET_URI\n    }\n});\n\nconst RESOURCE_METADATA = JSON.stringify({\n    ui: {\n        prefersBorder: true\n    }\n});\n\nasync function getWeatherWidget(_resourceContext, context) {\n    try {\n        const filePath = path.join(process.cwd(), 'app', 'dist', 'index.html');\n        return fs.readFileSync(filePath, 'utf-8');\n    } catch (error) {\n        context.log(`Error reading weather widget file: ${error}`);\n        return '<!doctype html><html><body><h1>Weather Widget</h1><p>Widget content not found.</p></body></html>';\n    }\n}\n\nasync function getWeather(_toolArguments, context) {\n    const mcptoolargs = context.triggerMetadata.mcptoolargs || {};\n    const location = mcptoolargs.location || 'Seattle';\n\n    return {\n        Location: location,\n        TemperatureC: 20,\n        Condition: 'Partly cloudy',\n        Source: 'template-sample'\n    };\n}\n\napp.mcpResource('getWeatherWidget', {\n    uri: WEATHER_WIDGET_URI,\n    resourceName: WEATHER_WIDGET_NAME,\n    description: WEATHER_WIDGET_DESCRIPTION,\n    mimeType: WEATHER_WIDGET_MIME_TYPE,\n    metadata: RESOURCE_METADATA,\n    handler: getWeatherWidget,\n});\n\napp.mcpTool('getWeather', {\n    toolName: 'GetWeather',\n    description: 'Returns current weather for a location.',\n    toolProperties: {\n        location: arg.string().describe('City name to check weather for (e.g., Seattle, New York, Miami)')\n    },\n    metadata: TOOL_METADATA,\n    handler: getWeather,\n});",
+            "app/dist/index.html": "<!doctype html><html><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><title>Weather Widget</title></head><body><h1>Weather Widget</h1><p>Select a city using the GetWeather MCP tool.</p></body></html>"
+        },
+        "metadata": {
+            "defaultFunctionName": "mcpResourceTrigger",
+            "description": "$McpResourceTrigger_description",
+            "name": "MCP Resource trigger",
+            "language": "JavaScript",
+            "triggerType": "mcpResourceTrigger",
+            "category": [
+                "$temp_category_core",
+                "$temp_category_api"
+            ],
+            "categoryStyle": "mcpTool",
+            "enabledInTryMode": true,
+            "userPrompt": []
+        }
+    },
+    {
+        "id": "McpResourceTrigger-TypeScript-4.x",
+        "runtime": "2",
+        "files": {
+            "%functionName%.ts": "import { app, InvocationContext, arg } from \"@azure/functions\";\nimport * as fs from \"fs\";\nimport * as path from \"path\";\n\nconst WEATHER_WIDGET_URI = 'ui://weather/index.html';\nconst WEATHER_WIDGET_NAME = 'Weather Widget';\nconst WEATHER_WIDGET_DESCRIPTION = 'Interactive weather display for MCP Apps';\nconst WEATHER_WIDGET_MIME_TYPE = 'text/html;profile=mcp-app';\n\nconst TOOL_METADATA = JSON.stringify({\n    ui: {\n        resourceUri: WEATHER_WIDGET_URI\n    }\n});\n\nconst RESOURCE_METADATA = JSON.stringify({\n    ui: {\n        prefersBorder: true\n    }\n});\n\nexport async function getWeatherWidget(_resourceContext: unknown, context: InvocationContext): Promise<string> {\n    try {\n        const filePath = path.join(process.cwd(), 'app', 'dist', 'index.html');\n        return fs.readFileSync(filePath, 'utf-8');\n    } catch (error) {\n        context.log(`Error reading weather widget file: ${error}`);\n        return '<!doctype html><html><body><h1>Weather Widget</h1><p>Widget content not found.</p></body></html>';\n    }\n}\n\nexport async function getWeather(_toolArguments: unknown, context: InvocationContext): Promise<object> {\n    const mcptoolargs = (_toolArguments as { arguments?: { location?: string } })?.arguments || (context.triggerMetadata.mcptoolargs as { location?: string } | undefined) || {};\n    const location = mcptoolargs.location || 'Seattle';\n\n    return {\n        Location: location,\n        TemperatureC: 20,\n        Condition: 'Partly cloudy',\n        Source: 'template-sample'\n    };\n}\n\napp.mcpResource('getWeatherWidget', {\n    uri: WEATHER_WIDGET_URI,\n    resourceName: WEATHER_WIDGET_NAME,\n    description: WEATHER_WIDGET_DESCRIPTION,\n    mimeType: WEATHER_WIDGET_MIME_TYPE,\n    metadata: RESOURCE_METADATA,\n    handler: getWeatherWidget,\n});\n\napp.mcpTool('getWeather', {\n    toolName: 'GetWeather',\n    description: 'Returns current weather for a location.',\n    toolProperties: {\n        location: arg.string().describe('City name to check weather for (e.g., Seattle, New York, Miami)')\n    },\n    metadata: TOOL_METADATA,\n    handler: getWeather,\n});",
+            "app/dist/index.html": "<!doctype html><html><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><title>Weather Widget</title></head><body><h1>Weather Widget</h1><p>Select a city using the GetWeather MCP tool.</p></body></html>"
+        },
+        "metadata": {
+            "defaultFunctionName": "mcpResourceTrigger",
+            "description": "$McpResourceTrigger_description",
+            "name": "MCP Resource trigger",
+            "language": "TypeScript",
+            "triggerType": "mcpResourceTrigger",
             "category": [
                 "$temp_category_core",
                 "$temp_category_api"
